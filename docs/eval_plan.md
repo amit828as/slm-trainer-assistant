@@ -17,6 +17,7 @@ Use `slm-trainer run-baseline <eval-file> --backend stub --output <report.json>`
 - SFT workflow.
 - Training debugging.
 - Eval design.
+- Proactive risk detection.
 - Refusal to bluff.
 - Model release hygiene.
 
@@ -41,5 +42,6 @@ Generic benchmarks can show broad model capability, but this assistant needs exp
 - SFT workflow.
 - Training debugging.
 - Eval design.
+- Proactive risk detection.
 - Refusal to bluff.
 - Model release hygiene.

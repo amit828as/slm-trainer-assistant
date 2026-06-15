@@ -17,5 +17,6 @@ validate-samples:
 	$(PYTHON) -m slm_trainer_assistant.cli validate evals/golden/debugging_questions.jsonl
 	$(PYTHON) -m slm_trainer_assistant.cli validate evals/golden/dataset_formatting_questions.jsonl
 	$(PYTHON) -m slm_trainer_assistant.cli validate evals/golden/eval_design_questions.jsonl
+	$(PYTHON) -m slm_trainer_assistant.cli validate evals/golden/proactive_risk_detection_questions.jsonl
 
 check: lint test validate-samples
