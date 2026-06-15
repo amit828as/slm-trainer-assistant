@@ -7,7 +7,12 @@ import typer
 
 from slm_trainer_assistant.dataset_stats import collect_stats, format_stats
 from slm_trainer_assistant.dataset_validator import validate_jsonl_file
-from slm_trainer_assistant.eval_report import write_report
+from slm_trainer_assistant.eval_report import (
+    format_report_summary,
+    load_report,
+    summarize_report,
+    write_report,
+)
 from slm_trainer_assistant.eval_runner import run_baseline_eval
 from slm_trainer_assistant.model_backends import get_backend
 
@@ -60,6 +65,15 @@ def run_baseline(
         raise typer.Exit(code=1) from exc
 
     typer.echo(f"wrote baseline report: {report_path}")
+
+
+@app.command("summarize-report")
+def summarize_report_command(report_path: Path) -> None:
+    """Summarize human review fields in a baseline report."""
+
+    report = load_report(report_path)
+    summary = summarize_report(report)
+    typer.echo(format_report_summary(summary))
 
 
 if __name__ == "__main__":
