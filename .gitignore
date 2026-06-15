@@ -1,0 +1,28 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.DS_Store
+
+# Local experiment outputs and generated model artifacts.
+checkpoints/
+outputs/
+runs/
+wandb/
+mlruns/
+*.safetensors
+*.bin
+*.pt
+*.gguf
+
+# Keep dataset folders, but avoid accidentally committing bulky local corpora.
+data/raw/*
+data/processed/*
+data/train/*
+data/rejected/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/train/.gitkeep
+!data/rejected/.gitkeep

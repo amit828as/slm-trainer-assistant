@@ -1,0 +1,23 @@
+# Placeholder only. Do not run until schema, evals, and baseline reports are ready.
+backend: trl_peft
+method: lora
+base_model: TODO
+dataset_path: data/train/TODO.jsonl
+output_dir: outputs/trl-peft-lora-TODO
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+
+training:
+  epochs: 1
+  learning_rate: 0.0002
+  max_seq_length: 2048
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
