@@ -26,3 +26,7 @@ data/rejected/*
 !data/processed/.gitkeep
 !data/train/.gitkeep
 !data/rejected/.gitkeep
+
+# Generated eval reports are local experiment artifacts by default.
+evals/reports/*.json
+!evals/reports/.gitkeep

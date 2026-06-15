@@ -8,6 +8,8 @@ The project starts with evals because fine-tuning without measurement is guesswo
 
 Before the first LoRA run, choose one or more baseline models and collect their answers on the golden eval set. The goal is not a perfect numeric score at first. The goal is to understand the model's failure patterns.
 
+Use `slm-trainer run-baseline <eval-file> --backend stub --output <report.json>` to exercise the report pipeline locally. The `stub` backend is deterministic and does not call a real model; provider backends should be added only after the baseline report shape is stable.
+
 ## Eval Question Categories
 
 - Dataset formatting.

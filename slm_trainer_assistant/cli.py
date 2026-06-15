@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
 from slm_trainer_assistant.dataset_stats import collect_stats, format_stats
 from slm_trainer_assistant.dataset_validator import validate_jsonl_file
+from slm_trainer_assistant.eval_report import write_report
+from slm_trainer_assistant.eval_runner import run_baseline_eval
+from slm_trainer_assistant.model_backends import get_backend
 
 app = typer.Typer(help="Tools for SLM trainer datasets and evals.")
 
@@ -35,6 +39,27 @@ def stats(path: Path) -> None:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(format_stats(dataset_stats))
+
+
+@app.command("run-baseline")
+def run_baseline(
+    eval_file: Path,
+    output: Annotated[Path, typer.Option("--output", "-o", help="JSON report output path.")],
+    backend_name: Annotated[
+        str, typer.Option("--backend", help="Model backend to use.")
+    ] = "stub",
+) -> None:
+    """Collect baseline model responses for an eval JSONL file."""
+
+    try:
+        backend = get_backend(backend_name)
+        report = run_baseline_eval(eval_file, backend)
+        report_path = write_report(report, output)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+    typer.echo(f"wrote baseline report: {report_path}")
 
 
 if __name__ == "__main__":
