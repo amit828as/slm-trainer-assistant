@@ -12,6 +12,11 @@ Use `slm-trainer run-baseline <eval-file> --backend stub --output <report.json>`
 
 For real model baselines, use the Kaggle workflow in `docs/notebook_baseline.md` so model weights and heavy inference dependencies stay outside the normal local and CI setup.
 
+The current Kaggle example uses `google/gemma-4-E4B-it`, but the eval workflow is
+not tied to Gemma. Other compatible instruct models can be substituted by
+changing the model id and output report filename. Keep the model id in the
+report metadata so comparisons are traceable.
+
 After reviewing responses by hand, fill in `human_score`, matched/missed traits, triggered anti-traits, `failure_type`, and `review_notes` in the report JSON. Then run `slm-trainer summarize-report <report.json>` to turn the review into a feedback summary before changing data or training settings.
 
 ## Eval Quality Criteria

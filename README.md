@@ -51,6 +51,13 @@ python -m slm_trainer_assistant.cli stats data/eval/sample_eval.jsonl
 slm-trainer stats data/eval/sample_eval.jsonl
 ```
 
+## Baseline Example Model
+
+The current real-model baseline example uses `google/gemma-4-E4B-it` in Kaggle.
+That model choice is interchangeable: use another compatible instruct model by
+changing the `--model` value and report filename, then adjust Kaggle hardware or
+dependencies if that model needs a different runtime.
+
 ## Run Tests
 
 ```bash

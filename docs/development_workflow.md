@@ -70,6 +70,10 @@ Use TDD or test-alongside development for schemas, validators, CLI behavior, rep
 
 Use eval-driven development for model quality. Before changing training data or model behavior, define what better behavior means in eval examples, expected traits, anti-traits, and failure reports. Training loss is useful telemetry, but it is not a substitute for behavior evaluation.
 
+When changing the example baseline model, update the model id, report filename,
+runtime notes, and docs together. The current worked example is
+`google/gemma-4-E4B-it`, but the repo should stay model-interchangeable.
+
 ## Data Hygiene
 
 Keep train, eval, stress, and rejected data separate. Never copy golden eval examples into training data. If an eval reveals a gap, create new training examples that teach the same skill without duplicating the eval item.
