@@ -6,13 +6,16 @@ This keeps evals and datasets reusable across Unsloth, TRL + PEFT, and future ba
 
 from __future__ import annotations
 
+from pathlib import PurePosixPath
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Role = Literal["system", "user", "assistant"]
 Difficulty = Literal["beginner", "intermediate", "advanced"]
 SourceType = Literal["manual", "synthetic", "public_doc_derived", "user_notes", "rejected"]
+MediaType = Literal["image"]
+IMAGE_MEDIA_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp"})
 
 
 class Message(BaseModel):
@@ -43,6 +46,36 @@ class TrainingExample(BaseModel):
         return self
 
 
+class EvalMedia(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: MediaType
+    path: str = Field(min_length=1)
+    description: str | None = None
+
+    @field_validator("path")
+    @classmethod
+    def require_safe_repo_relative_image_path(cls, value: str) -> str:
+        normalized = value.strip()
+        path = PurePosixPath(normalized)
+        if not normalized or path.is_absolute():
+            raise ValueError("media path must be repo-relative")
+        if "://" in normalized or any(part in {"", ".", ".."} for part in path.parts):
+            raise ValueError("media path must not contain empty, current, or parent segments")
+        if path.suffix.lower() not in IMAGE_MEDIA_EXTENSIONS:
+            allowed = ", ".join(sorted(IMAGE_MEDIA_EXTENSIONS))
+            raise ValueError(f"image media path must end with one of: {allowed}")
+        return normalized
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
 class EvalExample(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -50,6 +83,7 @@ class EvalExample(BaseModel):
     category: str = Field(min_length=1)
     difficulty: Difficulty
     question: str = Field(min_length=1)
+    media: list[EvalMedia] = Field(default_factory=list)
     expected_traits: list[str] = Field(min_length=1)
     anti_traits: list[str] = Field(default_factory=list)
 

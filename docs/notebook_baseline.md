@@ -55,7 +55,7 @@ Install notebook-only model dependencies inside Kaggle:
 ```bash
 %%bash
 set -e
-python -m pip install -U transformers accelerate huggingface_hub torch
+python -m pip install -U transformers accelerate huggingface_hub pillow torch
 ```
 
 These dependencies are intentionally not part of `pyproject.toml`.
@@ -120,6 +120,26 @@ The script intentionally requires `--model` so the baseline report always record
 The script supports Gemma 4 text evals by using the model's `AutoProcessor`
 chat template and `AutoModelForCausalLM` load path. It keeps thinking disabled
 for deterministic baseline answers.
+
+## Run One Image Baseline
+
+Gemma 4 E4B-it can also read images. The text golden evals above are still the
+first smoke test, but image evals are needed before claiming that a multimodal
+model uses visual evidence correctly.
+
+```bash
+%%bash
+set -e
+cd /kaggle/working/slm-trainer-assistant
+python scripts/run_kaggle_baseline.py \
+  --eval-file evals/golden/multimodal_image_questions.jsonl \
+  --output evals/reports/multimodal_image_gemma4_e4b_it.json \
+  --model google/gemma-4-E4B-it \
+  --max-new-tokens 512
+```
+
+When an eval file contains `media`, the script switches to the multimodal model
+load path and stores the media metadata in the JSON report.
 
 If you want to run without Hugging Face login, pass an empty secret name:
 

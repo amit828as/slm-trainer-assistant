@@ -63,6 +63,7 @@ def test_run_baseline_eval_creates_deterministic_stub_report(tmp_path: Path) -> 
     )
     assert report.results[0].expected_traits == ["checks eval quality"]
     assert report.results[0].anti_traits == ["blindly recommends more epochs"]
+    assert report.results[0].media == []
     assert report.results[0].human_score is None
     assert report.results[0].matched_traits == []
     assert report.results[0].missed_traits == []
@@ -188,6 +189,7 @@ def test_load_report_defaults_review_fields_for_existing_reports(tmp_path: Path)
 
     assert isinstance(report, EvalReport)
     assert report.metadata == {}
+    assert report.results[0].media == []
     assert report.results[0].human_score is None
     assert report.results[0].matched_traits == []
     assert report.results[0].failure_type is None
@@ -234,3 +236,24 @@ def test_cli_summarize_report_outputs_review_summary(tmp_path: Path) -> None:
     assert "Average score: 3.0 / 5" in result.output
     assert "- good_answer: 1" in result.output
     assert "- missed_risk: 1" in result.output
+
+
+def test_run_baseline_eval_records_image_media(tmp_path: Path) -> None:
+    eval_file = tmp_path / "image-evals.jsonl"
+    eval_file.write_text(
+        (
+            '{"id": "image-001", "category": "debugging", "difficulty": "intermediate", '
+            '"question": "What does this chart suggest?", '
+            '"media": [{"type": "image", "path": "evals/media/debugging_loss_curve.png"}], '
+            '"expected_traits": ["describes the visual trend"]}\n'
+        ),
+        encoding="utf-8",
+    )
+
+    report = run_baseline_eval(eval_file, StubBackend(), run_id="test-run")
+
+    assert report.results[0].media[0].path == "evals/media/debugging_loss_curve.png"
+    assert report.results[0].response == (
+        "[stub:image-001] Baseline placeholder for debugging/intermediate: "
+        "media=evals/media/debugging_loss_curve.png What does this chart suggest?"
+    )

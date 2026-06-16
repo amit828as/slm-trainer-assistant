@@ -23,6 +23,12 @@ After reviewing responses by hand, fill in `human_score`, matched/missed traits,
 
 Good eval questions should test behavior in realistic situations, not ask for definitions alone. Prefer prompts where the assistant must make a judgment: ask for missing context, warn about a likely risk, preserve train/eval separation, identify a workflow mismatch, or refuse to bluff. `expected_traits` should describe observable pieces of a good answer, and `anti_traits` should name risky failure modes such as confident guessing, vague advice, unsafe shortcuts, or ignoring data provenance.
 
+For multimodal models, text-only evals are not enough. They can show whether a
+model gives good generic advice, but they cannot prove the model reads visual
+evidence correctly. Image evals should include owned or generated media assets,
+ask questions that require inspecting the image, and use anti-traits for answers
+that ignore the visual input or infer facts not present in it.
+
 ## Eval Question Categories
 
 - Dataset formatting.
@@ -33,6 +39,7 @@ Good eval questions should test behavior in realistic situations, not ask for de
 - Proactive risk detection.
 - Refusal to bluff.
 - Model release hygiene.
+- Multimodal debugging and data hygiene.
 
 ## Failure Modes To Track
 

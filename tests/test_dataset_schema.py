@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from slm_trainer_assistant.schemas import EvalExample, TrainingExample
+from slm_trainer_assistant.schemas import EvalExample, EvalMedia, TrainingExample
 
 
 def test_valid_training_example() -> None:
@@ -73,3 +73,44 @@ def test_valid_eval_example() -> None:
 
     assert example.category == "debugging"
     assert example.expected_traits
+
+
+def test_valid_eval_example_with_image_media() -> None:
+    example = EvalExample.model_validate(
+        {
+            "id": "eval-image-001",
+            "category": "debugging",
+            "difficulty": "intermediate",
+            "question": "What risk does this chart suggest?",
+            "media": [
+                {
+                    "type": "image",
+                    "path": "evals/media/debugging_loss_curve.png",
+                    "description": "Synthetic loss and quality trend chart.",
+                }
+            ],
+            "expected_traits": ["mentions visual trend"],
+        }
+    )
+
+    assert example.media[0].type == "image"
+    assert example.media[0].path == "evals/media/debugging_loss_curve.png"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/tmp/evals/media/chart.png",
+        "../private/chart.png",
+        "evals/media/chart.gif",
+        "https://example.com/chart.png",
+    ],
+)
+def test_eval_media_rejects_unsafe_or_unsupported_paths(path: str) -> None:
+    with pytest.raises(ValidationError):
+        EvalMedia.model_validate(
+            {
+                "type": "image",
+                "path": path,
+            }
+        )

@@ -58,6 +58,11 @@ That model choice is interchangeable: use another compatible instruct model by
 changing the `--model` value and report filename, then adjust Kaggle hardware or
 dependencies if that model needs a different runtime.
 
+Gemma 4 E4B-it is multimodal, so the repo also includes a small image eval file
+under `evals/golden/multimodal_image_questions.jsonl`. Text evals remain the
+first smoke test; image evals check whether the model actually uses visual
+evidence.
+
 ## Run Tests
 
 ```bash

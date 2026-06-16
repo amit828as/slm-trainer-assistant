@@ -49,11 +49,17 @@ def test_load_hf_model_uses_processor_for_gemma4(monkeypatch) -> None:
             calls["model"].append((model_name, kwargs))
             return SimpleNamespace(kind="model")
 
+    class FakeAutoModelForMultimodalLM:
+        @classmethod
+        def from_pretrained(cls, model_name: str, **kwargs):
+            raise AssertionError("multimodal loader should not be used for text evals")
+
     fake_transformers = types.ModuleType("transformers")
     fake_transformers.AutoConfig = FakeAutoConfig
     fake_transformers.AutoProcessor = FakeAutoProcessor
     fake_transformers.AutoTokenizer = FakeAutoTokenizer
     fake_transformers.AutoModelForCausalLM = FakeAutoModelForCausalLM
+    fake_transformers.AutoModelForMultimodalLM = FakeAutoModelForMultimodalLM
     monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
 
     text_processor, model = script.load_hf_model("google/gemma-4-E4B-it")
@@ -106,11 +112,17 @@ def test_load_hf_model_uses_tokenizer_for_non_gemma4(monkeypatch) -> None:
         def from_pretrained(cls, model_name: str, **kwargs):
             return SimpleNamespace(kind="model")
 
+    class FakeAutoModelForMultimodalLM:
+        @classmethod
+        def from_pretrained(cls, model_name: str, **kwargs):
+            raise AssertionError("multimodal loader should not be used for text evals")
+
     fake_transformers = types.ModuleType("transformers")
     fake_transformers.AutoConfig = FakeAutoConfig
     fake_transformers.AutoProcessor = FakeAutoProcessor
     fake_transformers.AutoTokenizer = FakeAutoTokenizer
     fake_transformers.AutoModelForCausalLM = FakeAutoModelForCausalLM
+    fake_transformers.AutoModelForMultimodalLM = FakeAutoModelForMultimodalLM
     monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
 
     text_processor, _model = script.load_hf_model("example/text-only-model")
@@ -118,6 +130,69 @@ def test_load_hf_model_uses_tokenizer_for_non_gemma4(monkeypatch) -> None:
     assert text_processor.kind == "tokenizer"
     assert calls["processor"] == []
     assert calls["tokenizer"] == ["example/text-only-model"]
+
+
+def test_load_hf_model_uses_multimodal_model_when_media_is_present(monkeypatch) -> None:
+    script = _load_script_module()
+    calls: dict[str, list[tuple[str, dict]]] = {
+        "processor": [],
+        "causal": [],
+        "multimodal": [],
+    }
+
+    class FakeAutoConfig:
+        @classmethod
+        def from_pretrained(cls, model_name: str, **kwargs):
+            return SimpleNamespace(model_type="gemma4", architectures=[])
+
+    class FakeAutoProcessor:
+        @classmethod
+        def from_pretrained(cls, model_name: str, **kwargs):
+            calls["processor"].append((model_name, kwargs))
+            return SimpleNamespace(kind="processor")
+
+    class FakeAutoTokenizer:
+        @classmethod
+        def from_pretrained(cls, model_name: str, **kwargs):
+            raise AssertionError("tokenizer should not be used for multimodal evals")
+
+    class FakeAutoModelForCausalLM:
+        @classmethod
+        def from_pretrained(cls, model_name: str, **kwargs):
+            calls["causal"].append((model_name, kwargs))
+            return SimpleNamespace(kind="causal")
+
+    class FakeAutoModelForMultimodalLM:
+        @classmethod
+        def from_pretrained(cls, model_name: str, **kwargs):
+            calls["multimodal"].append((model_name, kwargs))
+            return SimpleNamespace(kind="multimodal")
+
+    fake_transformers = types.ModuleType("transformers")
+    fake_transformers.AutoConfig = FakeAutoConfig
+    fake_transformers.AutoProcessor = FakeAutoProcessor
+    fake_transformers.AutoTokenizer = FakeAutoTokenizer
+    fake_transformers.AutoModelForCausalLM = FakeAutoModelForCausalLM
+    fake_transformers.AutoModelForMultimodalLM = FakeAutoModelForMultimodalLM
+    monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
+
+    text_processor, model = script.load_hf_model("google/gemma-4-E4B-it", use_multimodal=True)
+
+    assert text_processor.kind == "processor"
+    assert model.kind == "multimodal"
+    assert calls["processor"] == [
+        (
+            "google/gemma-4-E4B-it",
+            {"padding_side": "left", "trust_remote_code": True},
+        )
+    ]
+    assert calls["causal"] == []
+    assert calls["multimodal"] == [
+        (
+            "google/gemma-4-E4B-it",
+            {"device_map": "auto", "dtype": "auto", "trust_remote_code": True},
+        )
+    ]
 
 
 def test_generate_response_uses_processor_template_and_parser() -> None:
@@ -213,6 +288,95 @@ def test_generate_response_uses_processor_template_and_parser() -> None:
     assert model.generate_kwargs["max_new_tokens"] == 24
     assert model.generate_kwargs["pad_token_id"] == 99
     assert model.generate_kwargs["input_ids"].shape == (1, 3)
+
+
+def test_generate_response_uses_multimodal_template_for_image_media(monkeypatch) -> None:
+    script = _load_script_module()
+    monkeypatch.setattr(script, "_load_image", lambda media: f"image:{media.path}")
+
+    class FakeInputIds:
+        shape = (1, 4)
+
+    class FakeInputs(dict):
+        def __init__(self) -> None:
+            super().__init__({"input_ids": FakeInputIds()})
+            self.to_args = None
+            self.to_kwargs = None
+
+        def to(self, *args, **kwargs):
+            self.to_args = args
+            self.to_kwargs = kwargs
+            return self
+
+    class FakeGeneratedRow:
+        def __getitem__(self, item):
+            return ["generated-token-ids", item.start]
+
+    class FakeOutput:
+        def __getitem__(self, index: int):
+            assert index == 0
+            return FakeGeneratedRow()
+
+    class FakeProcessor:
+        def __init__(self) -> None:
+            self.messages = None
+            self.template_kwargs = None
+
+        def apply_chat_template(self, messages, **kwargs):
+            self.messages = messages
+            self.template_kwargs = kwargs
+            return FakeInputs()
+
+        def decode(self, generated_ids, *, skip_special_tokens: bool) -> str:
+            assert generated_ids == ["generated-token-ids", 4]
+            assert skip_special_tokens is True
+            return "image response"
+
+    class FakeModel:
+        device = "cuda:0"
+        dtype = "bfloat16"
+
+        def __init__(self) -> None:
+            self.generate_kwargs = None
+
+        def generate(self, **kwargs):
+            self.generate_kwargs = kwargs
+            return FakeOutput()
+
+    processor = FakeProcessor()
+    model = FakeModel()
+
+    response = script.generate_response(
+        processor,
+        model,
+        "What does this chart show?",
+        media=[
+            SimpleNamespace(
+                type="image",
+                path="evals/media/debugging_loss_curve.png",
+            )
+        ],
+        max_new_tokens=32,
+    )
+
+    assert response == "image response"
+    assert processor.template_kwargs == {
+        "tokenize": True,
+        "add_generation_prompt": True,
+        "return_dict": True,
+        "return_tensors": "pt",
+        "enable_thinking": False,
+    }
+    assert processor.messages[1]["content"][0] == {
+        "type": "image",
+        "image": "image:evals/media/debugging_loss_curve.png",
+    }
+    assert processor.messages[1]["content"][1] == {
+        "type": "text",
+        "text": "What does this chart show?",
+    }
+    assert model.generate_kwargs["max_new_tokens"] == 32
+    assert model.generate_kwargs["input_ids"].shape == (1, 4)
 
 
 def test_login_from_kaggle_secret_is_noop_outside_kaggle(monkeypatch) -> None:

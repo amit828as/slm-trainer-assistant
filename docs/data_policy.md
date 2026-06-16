@@ -10,6 +10,11 @@ Keep records for training data sources. Every example should identify whether it
 
 Separate train, eval, and stress sets. Do not mix eval examples into training data. Eval contamination makes a model look better without proving it generalized.
 
+For multimodal evals, keep media fixtures small and reviewable. Store owned,
+generated, or clearly licensed assets under `evals/media/`, reference them with
+repo-relative paths, and do not use private screenshots or borrowed assets
+without documented permission.
+
 ## Licensing
 
 Avoid copyrighted or unclear-license sources. Public documentation can be useful, but examples derived from it should be marked and should preserve source references when possible.

@@ -46,6 +46,7 @@ def run_baseline_eval(
             category=example.category,
             difficulty=example.difficulty,
             question=example.question,
+            media=example.media,
             response=backend.generate(example),
             expected_traits=example.expected_traits,
             anti_traits=example.anti_traits,

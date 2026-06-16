@@ -26,9 +26,13 @@ class StubBackend:
         return "stub"
 
     def generate(self, example: EvalExample) -> str:
+        media_note = ""
+        if example.media:
+            media_paths = ", ".join(media.path for media in example.media)
+            media_note = f" media={media_paths}"
         return (
             f"[stub:{example.id}] Baseline placeholder for "
-            f"{example.category}/{example.difficulty}: {example.question}"
+            f"{example.category}/{example.difficulty}:{media_note} {example.question}"
         )
 
 

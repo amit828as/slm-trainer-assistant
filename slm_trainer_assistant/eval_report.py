@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from slm_trainer_assistant.schemas import Difficulty
+from slm_trainer_assistant.schemas import Difficulty, EvalMedia
 
 
 class EvalResult(BaseModel):
@@ -19,6 +19,7 @@ class EvalResult(BaseModel):
     category: str = Field(min_length=1)
     difficulty: Difficulty
     question: str = Field(min_length=1)
+    media: list[EvalMedia] = Field(default_factory=list)
     response: str = Field(min_length=1)
     expected_traits: list[str] = Field(min_length=1)
     anti_traits: list[str] = Field(default_factory=list)

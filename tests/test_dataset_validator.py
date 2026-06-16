@@ -49,3 +49,21 @@ def test_stats_counts_categories_correctly(tmp_path: Path) -> None:
     assert stats.categories["debugging"] == 2
     assert stats.categories["lora"] == 1
     assert stats.difficulties["beginner"] == 2
+
+
+def test_validator_accepts_image_eval_media(tmp_path: Path) -> None:
+    dataset_path = tmp_path / "image-evals.jsonl"
+    dataset_path.write_text(
+        (
+            '{"id": "image-001", "category": "debugging", "difficulty": "intermediate", '
+            '"question": "What does the chart show?", '
+            '"media": [{"type": "image", "path": "evals/media/debugging_loss_curve.png"}], '
+            '"expected_traits": ["reads the chart"]}\n'
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_jsonl_file(dataset_path)
+
+    assert result.is_valid
+    assert len(result.examples) == 1
