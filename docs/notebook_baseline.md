@@ -60,9 +60,7 @@ python scripts/run_kaggle_baseline.py \
   --max-new-tokens 512
 ```
 
-The script intentionally requires `--model` so the baseline report always records an explicit model choice.
-
-The current report schema records the model through `backend_name`, for example `huggingface:google/gemma-3-4b-it`. It does not yet have a clean metadata block for `max_new_tokens` or the exact system prompt. Until that exists, keep the notebook command cell next to the downloaded report so the generation settings are recoverable. A future report-schema iteration should add explicit run metadata.
+The script intentionally requires `--model` so the baseline report always records an explicit model choice. The report also writes a small `metadata` block with the model id, `max_new_tokens`, and the system prompt used for generation.
 
 ## Bring The Report Back
 

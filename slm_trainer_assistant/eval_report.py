@@ -54,6 +54,7 @@ class EvalReport(BaseModel):
     backend_name: str = Field(min_length=1)
     eval_file: str = Field(min_length=1)
     total_questions: int = Field(ge=0)
+    metadata: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
     results: list[EvalResult]
 
 

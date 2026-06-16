@@ -55,6 +55,7 @@ def test_run_baseline_eval_creates_deterministic_stub_report(tmp_path: Path) -> 
     assert report.backend_name == "stub"
     assert report.eval_file == str(eval_file)
     assert report.total_questions == 2
+    assert report.metadata == {}
     assert report.results[0].eval_id == "eval-001"
     assert report.results[0].response == (
         "[stub:eval-001] Baseline placeholder for debugging/intermediate: "
@@ -81,6 +82,7 @@ def test_write_report_outputs_json(tmp_path: Path) -> None:
     payload = json.loads(output_file.read_text(encoding="utf-8"))
     assert payload["run_id"] == "test-run"
     assert payload["backend_name"] == "stub"
+    assert payload["metadata"] == {}
     assert payload["total_questions"] == 2
     assert payload["results"][1]["eval_id"] == "eval-002"
     assert payload["results"][1]["human_score"] is None
@@ -185,9 +187,31 @@ def test_load_report_defaults_review_fields_for_existing_reports(tmp_path: Path)
     report = load_report(report_file)
 
     assert isinstance(report, EvalReport)
+    assert report.metadata == {}
     assert report.results[0].human_score is None
     assert report.results[0].matched_traits == []
     assert report.results[0].failure_type is None
+
+
+def test_report_can_record_run_metadata(tmp_path: Path) -> None:
+    eval_file = tmp_path / "evals.jsonl"
+    output_file = tmp_path / "baseline.json"
+    _write_eval_file(eval_file)
+    report = run_baseline_eval(eval_file, StubBackend(), run_id="test-run")
+    report.metadata = {
+        "model": "google/gemma-3-4b-it",
+        "max_new_tokens": 512,
+        "system_prompt": "You are an expert assistant.",
+    }
+
+    write_report(report, output_file)
+    payload = json.loads(output_file.read_text(encoding="utf-8"))
+
+    assert payload["metadata"] == {
+        "model": "google/gemma-3-4b-it",
+        "max_new_tokens": 512,
+        "system_prompt": "You are an expert assistant.",
+    }
 
 
 def test_cli_summarize_report_outputs_review_summary(tmp_path: Path) -> None:

@@ -128,6 +128,11 @@ def run_kaggle_baseline(
         backend_name=f"huggingface:{model_name}",
         eval_file=str(eval_file),
         total_questions=len(results),
+        metadata={
+            "model": model_name,
+            "max_new_tokens": max_new_tokens,
+            "system_prompt": SYSTEM_PROMPT,
+        },
         results=results,
     )
     return write_report(report, output)
