@@ -12,6 +12,10 @@ Use `slm-trainer run-baseline <eval-file> --backend stub --output <report.json>`
 
 After reviewing responses by hand, fill in `human_score`, matched/missed traits, triggered anti-traits, `failure_type`, and `review_notes` in the report JSON. Then run `slm-trainer summarize-report <report.json>` to turn the review into a feedback summary before changing data or training settings.
 
+## Eval Quality Criteria
+
+Good eval questions should test behavior in realistic situations, not ask for definitions alone. Prefer prompts where the assistant must make a judgment: ask for missing context, warn about a likely risk, preserve train/eval separation, identify a workflow mismatch, or refuse to bluff. `expected_traits` should describe observable pieces of a good answer, and `anti_traits` should name risky failure modes such as confident guessing, vague advice, unsafe shortcuts, or ignoring data provenance.
+
 ## Eval Question Categories
 
 - Dataset formatting.
