@@ -10,6 +10,8 @@ Before the first LoRA run, choose one or more baseline models and collect their 
 
 Use `slm-trainer run-baseline <eval-file> --backend stub --output <report.json>` to exercise the report pipeline locally. The `stub` backend is deterministic and does not call a real model; provider backends should be added only after the baseline report shape is stable.
 
+For real model baselines, use the Kaggle workflow in `docs/notebook_baseline.md` so model weights and heavy inference dependencies stay outside the normal local and CI setup.
+
 After reviewing responses by hand, fill in `human_score`, matched/missed traits, triggered anti-traits, `failure_type`, and `review_notes` in the report JSON. Then run `slm-trainer summarize-report <report.json>` to turn the review into a feedback summary before changing data or training settings.
 
 ## Eval Quality Criteria
