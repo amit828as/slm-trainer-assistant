@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sys
 import types
 from pathlib import Path
@@ -13,6 +14,26 @@ def _load_script_module() -> types.ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _write_eval_file(path: Path, *, eval_id: str, media: bool = False) -> None:
+    payload = {
+        "id": eval_id,
+        "category": "debugging",
+        "difficulty": "beginner",
+        "question": f"What should I do for {eval_id}?",
+        "expected_traits": ["answers carefully"],
+        "anti_traits": [],
+    }
+    if media:
+        payload["media"] = [
+            {
+                "type": "image",
+                "path": "evals/media/debugging_loss_quality.png",
+                "description": "Synthetic chart.",
+            }
+        ]
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
 
 
 def test_load_hf_model_uses_processor_for_gemma4(monkeypatch) -> None:
@@ -385,3 +406,116 @@ def test_login_from_kaggle_secret_is_noop_outside_kaggle(monkeypatch) -> None:
 
     assert script.login_from_kaggle_secret("HF_TOKEN") is False
     assert script.login_from_kaggle_secret("") is False
+
+
+def test_run_kaggle_baselines_skips_existing_and_reuses_model_groups(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    script = _load_script_module()
+    eval_dir = tmp_path / "evals" / "golden"
+    output_dir = tmp_path / "evals" / "reports"
+    eval_dir.mkdir(parents=True)
+    output_dir.mkdir(parents=True)
+    _write_eval_file(eval_dir / "beginner_questions.jsonl", eval_id="beginner-001")
+    _write_eval_file(eval_dir / "debugging_questions.jsonl", eval_id="debugging-001")
+    _write_eval_file(
+        eval_dir / "proactive_risk_detection_questions.jsonl",
+        eval_id="proactive-001",
+    )
+    _write_eval_file(
+        eval_dir / "multimodal_image_questions.jsonl",
+        eval_id="image-001",
+        media=True,
+    )
+    skipped_report = output_dir / "debugging_gemma4_e4b_it.json"
+    skipped_report.write_text('{"already": "there"}\n', encoding="utf-8")
+    load_calls: list[bool] = []
+
+    def fake_login(secret_name: str | None) -> bool:
+        assert secret_name == "HF_TOKEN"
+        return True
+
+    def fake_load_hf_model(model_name: str, *, use_multimodal: bool = False):
+        assert model_name == "google/gemma-4-E4B-it"
+        load_calls.append(use_multimodal)
+        return (
+            SimpleNamespace(kind=f"processor:{use_multimodal}"),
+            SimpleNamespace(kind=f"model:{use_multimodal}"),
+        )
+
+    def fake_generate_response(processor, model, question: str, *, media=None, max_new_tokens: int):
+        assert max_new_tokens == 123
+        return f"{processor.kind}|{model.kind}|media={bool(media)}|{question}"
+
+    monkeypatch.setattr(script, "login_from_kaggle_secret", fake_login)
+    monkeypatch.setattr(script, "load_hf_model", fake_load_hf_model)
+    monkeypatch.setattr(script, "generate_response", fake_generate_response)
+
+    report_paths = script.run_kaggle_baselines(
+        eval_dir,
+        output_dir,
+        model_name="google/gemma-4-E4B-it",
+        max_new_tokens=123,
+        hf_token_secret="HF_TOKEN",
+        report_suffix="gemma4_e4b_it",
+        skip_existing=True,
+    )
+
+    assert load_calls == [False, True]
+    assert report_paths == [
+        output_dir / "beginner_gemma4_e4b_it.json",
+        output_dir / "proactive_gemma4_e4b_it.json",
+        output_dir / "multimodal_image_gemma4_e4b_it.json",
+    ]
+    assert skipped_report.read_text(encoding="utf-8") == '{"already": "there"}\n'
+    beginner_payload = json.loads(report_paths[0].read_text(encoding="utf-8"))
+    proactive_payload = json.loads(report_paths[1].read_text(encoding="utf-8"))
+    image_payload = json.loads(report_paths[2].read_text(encoding="utf-8"))
+    assert beginner_payload["metadata"]["hf_login"] == "kaggle_secret"
+    assert beginner_payload["metadata"]["model"] == "google/gemma-4-E4B-it"
+    assert beginner_payload["metadata"]["max_new_tokens"] == 123
+    assert beginner_payload["metadata"]["multimodal"] is False
+    assert proactive_payload["results"][0]["eval_id"] == "proactive-001"
+    assert image_payload["metadata"]["multimodal"] is True
+    assert beginner_payload["results"][0]["response"].startswith(
+        "processor:False|model:False|media=False"
+    )
+    assert image_payload["results"][0]["response"].startswith(
+        "processor:True|model:True|media=True"
+    )
+
+
+def test_parse_args_accepts_batch_mode(monkeypatch, tmp_path: Path) -> None:
+    script = _load_script_module()
+    eval_dir = tmp_path / "evals" / "golden"
+    output_dir = tmp_path / "evals" / "reports"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_kaggle_baseline.py",
+            "--eval-dir",
+            str(eval_dir),
+            "--output-dir",
+            str(output_dir),
+            "--model",
+            "google/gemma-4-E4B-it",
+            "--max-new-tokens",
+            "256",
+            "--report-suffix",
+            "gemma4_e4b_it",
+            "--skip-existing",
+        ],
+    )
+
+    args = script.parse_args()
+
+    assert args.eval_dir == eval_dir
+    assert args.output_dir == output_dir
+    assert args.eval_file is None
+    assert args.output is None
+    assert args.model == "google/gemma-4-E4B-it"
+    assert args.max_new_tokens == 256
+    assert args.report_suffix == "gemma4_e4b_it"
+    assert args.skip_existing is True

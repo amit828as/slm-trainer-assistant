@@ -88,9 +88,12 @@ if torch.cuda.is_available():
     print(torch.ones(1, device="cuda") + 1)
 ```
 
-## Run One Baseline
+## Run The Baseline Suite
 
-Start with one golden eval file before running the whole suite. For a quick smoke test, use a very small instruct model that the Kaggle runtime can load quickly. For the first meaningful baseline, use the candidate base model we may fine-tune later.
+Run the whole golden eval suite when collecting the baseline. For a quick smoke
+test, you can still run one file with `--eval-file` and `--output`, but the real
+baseline should cover every category so later comparisons have a complete
+starting point.
 
 For the first serious baseline, use:
 
@@ -109,31 +112,34 @@ report filename.
 set -e
 cd /kaggle/working/slm-trainer-assistant
 python scripts/run_kaggle_baseline.py \
-  --eval-file evals/golden/proactive_risk_detection_questions.jsonl \
-  --output evals/reports/proactive_gemma4_e4b_it.json \
+  --eval-dir evals/golden \
+  --output-dir evals/reports \
   --model google/gemma-4-E4B-it \
+  --report-suffix gemma4_e4b_it \
+  --skip-existing \
   --max-new-tokens 512
 ```
 
-The script intentionally requires `--model` so the baseline report always records an explicit model choice. The report also writes a small `metadata` block with the model id, `max_new_tokens`, and the system prompt used for generation.
+The script intentionally requires `--model` so every baseline report records an
+explicit model choice. The report also writes a small `metadata` block with the
+model id, `max_new_tokens`, and the system prompt used for generation.
 
 The script supports Gemma 4 text evals by using the model's `AutoProcessor`
 chat template and `AutoModelForCausalLM` load path. It keeps thinking disabled
-for deterministic baseline answers.
+for deterministic baseline answers. In batch mode, it loads the model once for
+all text eval files and once more only if multimodal evals are pending.
 
-## Run One Image Baseline
+## Run One Baseline
 
-Gemma 4 E4B-it can also read images. The text golden evals above are still the
-first smoke test, but image evals are needed before claiming that a multimodal
-model uses visual evidence correctly.
+Single-file mode is useful for a smoke test or a rerun of one category:
 
 ```bash
 %%bash
 set -e
 cd /kaggle/working/slm-trainer-assistant
 python scripts/run_kaggle_baseline.py \
-  --eval-file evals/golden/multimodal_image_questions.jsonl \
-  --output evals/reports/multimodal_image_gemma4_e4b_it.json \
+  --eval-file evals/golden/proactive_risk_detection_questions.jsonl \
+  --output evals/reports/proactive_gemma4_e4b_it.json \
   --model google/gemma-4-E4B-it \
   --max-new-tokens 512
 ```
