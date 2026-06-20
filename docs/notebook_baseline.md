@@ -90,10 +90,10 @@ if torch.cuda.is_available():
 
 ## Run The Baseline Suite
 
-Run the whole golden eval suite when collecting the baseline. For a quick smoke
-test, you can still run one file with `--eval-file` and `--output`, but the real
-baseline should cover every category so later comparisons have a complete
-starting point.
+Run the text golden eval suite when collecting the next baseline. For a quick
+smoke test, you can still run one file with `--eval-file` and `--output`, but
+the real text baseline should cover every text category so later comparisons
+have a complete starting point.
 
 For the first serious baseline, use:
 
@@ -113,10 +113,11 @@ set -e
 cd /kaggle/working/slm-trainer-assistant
 python scripts/run_kaggle_baseline.py \
   --eval-dir evals/golden \
-  --output-dir evals/reports \
+  --output-dir evals/reports/baseline \
+  --auto-version-output-dir \
+  --text-only \
   --model google/gemma-4-E4B-it \
   --report-suffix gemma4_e4b_it \
-  --skip-existing \
   --max-new-tokens 512
 ```
 
@@ -124,10 +125,18 @@ The script intentionally requires `--model` so every baseline report records an
 explicit model choice. The report also writes a small `metadata` block with the
 model id, `max_new_tokens`, and the system prompt used for generation.
 
+`--auto-version-output-dir` writes batch reports to the next numbered directory
+based on `--output-dir`. For example, if the existing flat JSON reports under
+`evals/reports/` are the first baseline record, the command above writes the new
+run under `evals/reports/baseline_v2/`; later reruns advance to
+`baseline_v3/`, `baseline_v4/`, and so on. `--text-only` skips eval files that
+contain media while the project is focused on text behavior.
+
 The script supports Gemma 4 text evals by using the model's `AutoProcessor`
 chat template and `AutoModelForCausalLM` load path. It keeps thinking disabled
 for deterministic baseline answers. In batch mode, it loads the model once for
-all text eval files and once more only if multimodal evals are pending.
+all text eval files and only loads the multimodal path when media evals are not
+skipped.
 
 ## Run One Baseline
 

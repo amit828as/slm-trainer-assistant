@@ -486,6 +486,89 @@ def test_run_kaggle_baselines_skips_existing_and_reuses_model_groups(
     )
 
 
+def test_run_kaggle_baselines_can_skip_multimodal_files(monkeypatch, tmp_path: Path) -> None:
+    script = _load_script_module()
+    eval_dir = tmp_path / "evals" / "golden"
+    output_dir = tmp_path / "evals" / "reports"
+    eval_dir.mkdir(parents=True)
+    output_dir.mkdir(parents=True)
+    _write_eval_file(eval_dir / "beginner_questions.jsonl", eval_id="beginner-001")
+    _write_eval_file(
+        eval_dir / "multimodal_image_questions.jsonl",
+        eval_id="image-001",
+        media=True,
+    )
+    load_calls: list[bool] = []
+
+    monkeypatch.setattr(script, "login_from_kaggle_secret", lambda secret_name: False)
+    monkeypatch.setattr(
+        script,
+        "load_hf_model",
+        lambda model_name, *, use_multimodal=False: (
+            load_calls.append(use_multimodal) or SimpleNamespace(kind="processor"),
+            SimpleNamespace(kind="model"),
+        ),
+    )
+    monkeypatch.setattr(
+        script,
+        "generate_response",
+        lambda processor, model, question, *, media=None, max_new_tokens: "response",
+    )
+
+    report_paths = script.run_kaggle_baselines(
+        eval_dir,
+        output_dir,
+        model_name="google/gemma-4-E4B-it",
+        max_new_tokens=123,
+        text_only=True,
+    )
+
+    assert load_calls == [False]
+    assert report_paths == [output_dir / "beginner_gemma_4_e4b_it.json"]
+
+
+def test_run_kaggle_baselines_can_auto_version_output_dir(monkeypatch, tmp_path: Path) -> None:
+    script = _load_script_module()
+    eval_dir = tmp_path / "evals" / "golden"
+    reports_dir = tmp_path / "evals" / "reports"
+    eval_dir.mkdir(parents=True)
+    reports_dir.mkdir(parents=True)
+    _write_eval_file(eval_dir / "beginner_questions.jsonl", eval_id="beginner-001")
+    (reports_dir / "beginner_gemma4_e4b_it.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(script, "login_from_kaggle_secret", lambda secret_name: False)
+    monkeypatch.setattr(
+        script,
+        "load_hf_model",
+        lambda model_name, *, use_multimodal=False: (
+            SimpleNamespace(kind="processor"),
+            SimpleNamespace(kind="model"),
+        ),
+    )
+    monkeypatch.setattr(
+        script,
+        "generate_response",
+        lambda processor, model, question, *, media=None, max_new_tokens: "response",
+    )
+
+    report_paths = script.run_kaggle_baselines(
+        eval_dir,
+        reports_dir / "baseline",
+        model_name="google/gemma-4-E4B-it",
+        max_new_tokens=123,
+        auto_version_output_dir=True,
+    )
+
+    assert report_paths == [reports_dir / "baseline_v2" / "beginner_gemma_4_e4b_it.json"]
+
+
+def test_system_prompt_keeps_words_separated() -> None:
+    script = _load_script_module()
+
+    assert "most likely risk" in script.SYSTEM_PROMPT
+    assert "mostlikely" not in script.SYSTEM_PROMPT
+
+
 def test_parse_args_accepts_batch_mode(monkeypatch, tmp_path: Path) -> None:
     script = _load_script_module()
     eval_dir = tmp_path / "evals" / "golden"

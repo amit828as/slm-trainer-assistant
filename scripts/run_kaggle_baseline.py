@@ -23,8 +23,9 @@ from slm_trainer_assistant.schemas import EvalMedia
 SYSTEM_PROMPT = (
     "You are a senior AI/ML engineer helping build and evaluate expert small language models. "
     "Answer directly and practically. Prefer concise, project-specific guidance over broad theory. "
-    "When reviewing SLM datasets, evals, fine-tuning runs, or release artifacts, identify the most likely risk first, "
-    "then give the next concrete action. Do not bluff. Ask for missing context when exact advice would be unsafe. "
+    "When reviewing SLM datasets, evals, fine-tuning runs, or release artifacts, identify the most "
+    "likely risk first, then give the next concrete action. Do not bluff. Ask for missing context "
+    "when exact advice would be unsafe. "
     "Avoid long checklists unless the user explicitly asks for one."
 )
 
@@ -70,6 +71,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="In batch mode, skip reports that already exist.",
     )
+    parser.add_argument(
+        "--text-only",
+        action="store_true",
+        help="In batch mode, skip eval files containing media.",
+    )
+    parser.add_argument(
+        "--auto-version-output-dir",
+        action="store_true",
+        help=(
+            "In batch mode, write to the next numbered directory based on --output-dir, "
+            "for example evals/reports/baseline becomes evals/reports/baseline_v2."
+        ),
+    )
 
     args = parser.parse_args()
     single_mode = args.eval_file is not None or args.output is not None
@@ -84,6 +98,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("--skip-existing is only valid with --eval-dir/--output-dir")
     if args.report_suffix and not batch_mode:
         parser.error("--report-suffix is only valid with --eval-dir/--output-dir")
+    if args.text_only and not batch_mode:
+        parser.error("--text-only is only valid with --eval-dir/--output-dir")
+    if args.auto_version_output_dir and not batch_mode:
+        parser.error("--auto-version-output-dir is only valid with --eval-dir/--output-dir")
     return args
 
 
@@ -486,6 +504,23 @@ def _batch_report_path(eval_file: Path, output_dir: Path, report_suffix: str) ->
     return output_dir / f"{_report_prefix_for_eval_file(eval_file)}_{report_suffix}.json"
 
 
+def _has_top_level_reports(output_dir: Path) -> bool:
+    return any(output_dir.glob("*.json"))
+
+
+def _next_versioned_output_dir(output_dir: Path) -> Path:
+    parent = output_dir.parent
+    pattern = re.compile(rf"^{re.escape(output_dir.name)}_v(\d+)$")
+    versions = [
+        int(match.group(1))
+        for path in parent.glob(f"{output_dir.name}_v*")
+        if path.is_dir() and (match := pattern.fullmatch(path.name)) is not None
+    ]
+    if _has_top_level_reports(parent):
+        versions.append(1)
+    return parent / f"{output_dir.name}_v{max(versions, default=0) + 1}"
+
+
 def _release_model_memory(text_processor: Any, model: Any) -> None:
     del text_processor
     del model
@@ -507,8 +542,12 @@ def run_kaggle_baselines(
     hf_token_secret: str | None = "HF_TOKEN",
     report_suffix: str | None = None,
     skip_existing: bool = False,
+    text_only: bool = False,
+    auto_version_output_dir: bool = False,
 ) -> list[Path]:
     report_suffix = report_suffix or _default_report_suffix(model_name)
+    if auto_version_output_dir:
+        output_dir = _next_versioned_output_dir(output_dir)
     eval_files = sorted(eval_dir.glob("*.jsonl"))
     if not eval_files:
         raise ValueError(f"no eval JSONL files found in {eval_dir}")
@@ -523,7 +562,11 @@ def run_kaggle_baselines(
             print(f"skipping existing report: {output}", flush=True)
             continue
         examples = load_eval_examples(eval_file)
-        pending_by_modality[_has_multimodal_examples(examples)].append(
+        uses_multimodal = _has_multimodal_examples(examples)
+        if text_only and uses_multimodal:
+            print(f"skipping multimodal eval file in text-only mode: {eval_file}", flush=True)
+            continue
+        pending_by_modality[uses_multimodal].append(
             (eval_file, output, examples)
         )
 
@@ -574,6 +617,8 @@ def main() -> None:
             hf_token_secret=args.hf_token_secret,
             report_suffix=args.report_suffix,
             skip_existing=args.skip_existing,
+            text_only=args.text_only,
+            auto_version_output_dir=args.auto_version_output_dir,
         )
         print(f"wrote {len(report_paths)} Kaggle baseline report(s)")
         for report_path in report_paths:
