@@ -611,10 +611,13 @@ def test_run_kaggle_baselines_can_auto_version_output_dir(monkeypatch, tmp_path:
     assert report_paths == [reports_dir / "baseline_v2" / "beginner_gemma_4_e4b_it.json"]
 
 
-def test_system_prompt_keeps_words_separated() -> None:
+def test_system_prompt_keeps_words_separated_and_encourages_adaptive_depth() -> None:
     script = _load_script_module()
 
     assert "most likely risk" in script.SYSTEM_PROMPT
+    assert "do not be shallow" in script.SYSTEM_PROMPT
+    assert "Use adaptive depth:" in script.SYSTEM_PROMPT
+    assert "Do not treat training loss" in script.SYSTEM_PROMPT
     assert "mostlikely" not in script.SYSTEM_PROMPT
 
 

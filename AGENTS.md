@@ -42,17 +42,22 @@ the virtualenv exists.
 The normal baseline path is all-category batch inference:
 
 ```bash
+RUN_NAME=baseline_v1_1_adaptive_depth_1024
 python scripts/run_kaggle_baseline.py \
   --eval-dir evals/golden \
-  --output-dir evals/reports \
+  --output-dir "evals/reports/${RUN_NAME}" \
+  --text-only \
   --model google/gemma-4-E4B-it \
   --report-suffix gemma4_e4b_it \
-  --skip-existing \
-  --max-new-tokens 512
+  --max-new-tokens 1024
 ```
 
 Single-file baseline runs are for smoke tests or targeted reruns, not for the
 main baseline record.
+
+Use explicit run names for Kaggle baseline records. Generated reports are not
+committed, so Kaggle cannot reliably auto-infer the next version after a fresh
+pull.
 
 Reports under `evals/reports/` are runtime artifacts. Review and summarize them
 locally, but do not commit them unless the project policy changes.

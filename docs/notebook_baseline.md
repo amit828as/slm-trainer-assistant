@@ -116,26 +116,28 @@ report filename.
 %%bash
 set -e
 cd /kaggle/working/slm-trainer-assistant
+RUN_NAME=baseline_v1_1_adaptive_depth_1024
 python scripts/run_kaggle_baseline.py \
   --eval-dir evals/golden \
-  --output-dir evals/reports/baseline \
-  --auto-version-output-dir \
+  --output-dir "evals/reports/${RUN_NAME}" \
   --text-only \
   --model google/gemma-4-E4B-it \
   --report-suffix gemma4_e4b_it \
-  --max-new-tokens 512
+  --max-new-tokens 1024
 ```
 
 The script intentionally requires `--model` so every baseline report records an
 explicit model choice. The report also writes a small `metadata` block with the
 model id, `max_new_tokens`, and the system prompt used for generation.
 
-`--auto-version-output-dir` writes batch reports to the next numbered directory
-based on `--output-dir`. For example, if the existing flat JSON reports under
-`evals/reports/` are the first baseline record, the command above writes the new
-run under `evals/reports/baseline_v2/`; later reruns advance to
-`baseline_v3/`, `baseline_v4/`, and so on. `--text-only` skips eval files that
-contain media while the project is focused on text behavior.
+Use an explicit `RUN_NAME` for Kaggle baseline records. Generated reports are
+local artifacts and are not committed, so a fresh Kaggle checkout cannot infer
+the next baseline version from existing report folders. For prompt ablations,
+change only the run name and the prompt, then keep the model, evals, backend,
+and `max_new_tokens` fixed. `--auto-version-output-dir` is still available as a
+local convenience, but explicit run names are better for Kaggle records.
+`--text-only` skips eval files that contain media while the project is focused
+on text behavior.
 
 The script supports Gemma 4 text evals by using the model's `AutoProcessor`
 chat template and `AutoModelForCausalLM` load path. It keeps thinking disabled
