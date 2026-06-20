@@ -55,10 +55,13 @@ Install notebook-only model dependencies inside Kaggle:
 ```bash
 %%bash
 set -e
-python -m pip install -U transformers accelerate huggingface_hub pillow torch
+python -m pip install -U transformers accelerate huggingface_hub pillow
 ```
 
-These dependencies are intentionally not part of `pyproject.toml`.
+These dependencies are intentionally not part of `pyproject.toml`. Keep
+Kaggle's preinstalled PyTorch/CUDA build unless the GPU smoke check below shows
+Torch itself is missing or broken. Do not install `torchvision`; the baseline
+script does not use it, and upgrading it can spend time reinstalling PyTorch.
 
 If the model needs a Hugging Face token, save it in Kaggle secrets as
 `HF_TOKEN`. Do not paste the token into the notebook. Add a small auth smoke
@@ -79,6 +82,7 @@ mainly a quick confirmation that the secret is wired correctly.
 Then confirm the GPU is usable:
 
 ```python
+import subprocess
 import torch
 
 print("torch", torch.__version__, "cuda", torch.version.cuda)
@@ -86,6 +90,7 @@ print("cuda available", torch.cuda.is_available())
 if torch.cuda.is_available():
     print("device", torch.cuda.get_device_name(0), torch.cuda.get_device_capability(0))
     print(torch.ones(1, device="cuda") + 1)
+subprocess.run(["nvidia-smi"], check=False)
 ```
 
 ## Run The Baseline Suite
@@ -137,6 +142,11 @@ chat template and `AutoModelForCausalLM` load path. It keeps thinking disabled
 for deterministic baseline answers. In batch mode, it loads the model once for
 all text eval files and only loads the multimodal path when media evals are not
 skipped.
+
+At model load time, the script prints CUDA availability and the model device map.
+If CUDA is unavailable, or if `device_map="auto"` offloads any layers to CPU or
+disk, the script stops immediately instead of continuing with very slow CPU-bound
+generation.
 
 ## Run One Baseline
 

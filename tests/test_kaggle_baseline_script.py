@@ -5,6 +5,8 @@ import types
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 
 def _load_script_module() -> types.ModuleType:
     script_path = Path(__file__).resolve().parents[1] / "scripts" / "run_kaggle_baseline.py"
@@ -36,8 +38,19 @@ def _write_eval_file(path: Path, *, eval_id: str, media: bool = False) -> None:
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
 
 
+def _install_fake_cuda(monkeypatch) -> None:
+    fake_torch = types.ModuleType("torch")
+    fake_torch.cuda = SimpleNamespace(
+        is_available=lambda: True,
+        device_count=lambda: 1,
+        get_device_name=lambda index: "Fake GPU",
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+
 def test_load_hf_model_uses_processor_for_gemma4(monkeypatch) -> None:
     script = _load_script_module()
+    _install_fake_cuda(monkeypatch)
     calls: dict[str, list[tuple[str, dict]]] = {
         "processor": [],
         "tokenizer": [],
@@ -104,6 +117,7 @@ def test_load_hf_model_uses_processor_for_gemma4(monkeypatch) -> None:
 
 def test_load_hf_model_uses_tokenizer_for_non_gemma4(monkeypatch) -> None:
     script = _load_script_module()
+    _install_fake_cuda(monkeypatch)
     calls: dict[str, list[str]] = {
         "processor": [],
         "tokenizer": [],
@@ -155,6 +169,7 @@ def test_load_hf_model_uses_tokenizer_for_non_gemma4(monkeypatch) -> None:
 
 def test_load_hf_model_uses_multimodal_model_when_media_is_present(monkeypatch) -> None:
     script = _load_script_module()
+    _install_fake_cuda(monkeypatch)
     calls: dict[str, list[tuple[str, dict]]] = {
         "processor": [],
         "causal": [],
@@ -214,6 +229,40 @@ def test_load_hf_model_uses_multimodal_model_when_media_is_present(monkeypatch) 
             {"device_map": "auto", "dtype": "auto", "trust_remote_code": True},
         )
     ]
+
+
+def test_load_hf_model_fails_when_cuda_is_unavailable(monkeypatch) -> None:
+    script = _load_script_module()
+
+    fake_torch = types.ModuleType("torch")
+    fake_torch.cuda = SimpleNamespace(is_available=lambda: False, device_count=lambda: 0)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+
+    with pytest.raises(SystemExit, match="CUDA is not available"):
+        script._assert_cuda_available()
+
+
+def test_load_hf_model_fails_when_model_offloads_to_cpu_or_disk() -> None:
+    script = _load_script_module()
+    model = SimpleNamespace(
+        hf_device_map={
+            "model.embed_tokens": 0,
+            "model.layers.0": "cuda:0",
+            "model.layers.1": "cpu",
+            "model.layers.2": "disk",
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="partially offloaded to CPU/disk"):
+        script.assert_model_not_cpu_offloaded(model)
+
+
+def test_load_hf_model_fails_when_model_device_is_cpu() -> None:
+    script = _load_script_module()
+    model = SimpleNamespace(device="cpu")
+
+    with pytest.raises(RuntimeError, match="loaded on CPU"):
+        script.assert_model_not_cpu_offloaded(model)
 
 
 def test_generate_response_uses_processor_template_and_parser() -> None:

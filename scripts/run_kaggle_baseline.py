@@ -187,6 +187,79 @@ def _load_multimodal_lm(auto_model_for_multimodal_lm: Any, model_name: str) -> A
         )
 
 
+def _assert_cuda_available() -> None:
+    try:
+        import torch
+    except ImportError as exc:
+        raise SystemExit(
+            "Missing notebook dependency. In Kaggle, run: python -m pip install -U torch"
+        ) from exc
+
+    if not torch.cuda.is_available():
+        raise SystemExit(
+            "CUDA is not available. In Kaggle, set the notebook accelerator to GPU "
+            "(not TPU or None), restart the session, then rerun the baseline."
+        )
+
+    device_count = torch.cuda.device_count()
+    device_names = [
+        torch.cuda.get_device_name(index)
+        for index in range(device_count)
+        if hasattr(torch.cuda, "get_device_name")
+    ]
+    print(
+        "CUDA available: "
+        f"{device_count} GPU(s)"
+        + (f" ({', '.join(device_names)})" if device_names else ""),
+        flush=True,
+    )
+
+
+def _offloaded_layer_names(model: Any, device_name: str) -> list[str]:
+    device_map = getattr(model, "hf_device_map", None)
+    if not device_map:
+        return []
+    return [
+        name
+        for name, device in device_map.items()
+        if str(device).lower() == device_name
+    ]
+
+
+def _print_model_device_summary(model: Any) -> None:
+    device_map = getattr(model, "hf_device_map", None)
+    if device_map:
+        devices = sorted({str(device) for device in device_map.values()})
+        print(f"model device map devices: {', '.join(devices)}", flush=True)
+        return
+
+    model_device = getattr(model, "device", None)
+    if model_device is not None:
+        print(f"model device: {model_device}", flush=True)
+
+
+def assert_model_not_cpu_offloaded(model: Any) -> None:
+    cpu_layers = _offloaded_layer_names(model, "cpu")
+    disk_layers = _offloaded_layer_names(model, "disk")
+    model_device = getattr(model, "device", None)
+    if str(model_device).lower() == "cpu":
+        raise RuntimeError(
+            "Model loaded on CPU, which will be very slow. Use a Kaggle GPU runtime "
+            "and confirm PyTorch can see CUDA before running the baseline."
+        )
+
+    if not cpu_layers and not disk_layers:
+        _print_model_device_summary(model)
+        return
+
+    raise RuntimeError(
+        "Model was partially offloaded to CPU/disk, which will be very slow. "
+        f"CPU layers: {cpu_layers[:5]} disk layers: {disk_layers[:5]}. "
+        "Use a Kaggle GPU runtime with more VRAM, a smaller model, lower precision, "
+        "or quantized loading."
+    )
+
+
 def load_hf_model(model_name: str, *, use_multimodal: bool = False) -> tuple[Any, Any]:
     try:
         from transformers import (
@@ -202,6 +275,7 @@ def load_hf_model(model_name: str, *, use_multimodal: bool = False) -> tuple[Any
             "python -m pip install -U transformers accelerate huggingface_hub pillow torch"
         ) from exc
 
+    _assert_cuda_available()
     config = AutoConfig.from_pretrained(model_name, trust_remote_code=True)
     if use_multimodal or _uses_processor_for_text(model_name, config):
         text_processor = AutoProcessor.from_pretrained(
@@ -216,6 +290,7 @@ def load_hf_model(model_name: str, *, use_multimodal: bool = False) -> tuple[Any
         model = _load_multimodal_lm(AutoModelForMultimodalLM, model_name)
     else:
         model = _load_causal_lm(AutoModelForCausalLM, model_name)
+    assert_model_not_cpu_offloaded(model)
     return text_processor, model
 
 
