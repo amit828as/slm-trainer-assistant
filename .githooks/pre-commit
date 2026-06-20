@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+if [ -x ".venv/bin/python" ]; then
+  PYTHON_BIN=".venv/bin/python"
+  PATH="$ROOT/.venv/bin:$PATH"
+  export PATH
+else
+  PYTHON_BIN="${PYTHON:-python}"
+fi
+
+echo "running pre-commit checks: make check"
+make PYTHON="$PYTHON_BIN" check
