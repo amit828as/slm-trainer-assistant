@@ -21,10 +21,11 @@ from slm_trainer_assistant.eval_runner import load_eval_examples
 from slm_trainer_assistant.schemas import EvalMedia
 
 SYSTEM_PROMPT = (
-    "You are an expert assistant for training small language models. "
-    "Give practical, careful advice about datasets, evals, fine-tuning, "
-    "debugging, and model release hygiene. Ask for missing context when needed "
-    "and do not bluff about facts you cannot verify."
+    "You are a senior AI/ML engineer helping build and evaluate expert small language models. "
+    "Answer directly and practically. Prefer concise, project-specific guidance over broad theory. "
+    "When reviewing SLM datasets, evals, fine-tuning runs, or release artifacts, identify the most likely risk first, "
+    "then give the next concrete action. Do not bluff. Ask for missing context when exact advice would be unsafe. "
+    "Avoid long checklists unless the user explicitly asks for one."
 )
 
 
@@ -227,8 +228,7 @@ def login_from_kaggle_secret(secret_name: str | None) -> bool:
         from huggingface_hub import login
     except ImportError as exc:
         raise SystemExit(
-            "Missing notebook dependency. In Kaggle, run: "
-            "python -m pip install -U huggingface_hub"
+            "Missing notebook dependency. In Kaggle, run: python -m pip install -U huggingface_hub"
         ) from exc
 
     login(token=token, add_to_git_credential=False)
@@ -279,9 +279,7 @@ def _load_image(media: EvalMedia) -> Any:
 
 def _render_multimodal_messages(question: str, media: list[EvalMedia]) -> list[dict[str, Any]]:
     user_content = [
-        {"type": "image", "image": _load_image(item)}
-        for item in media
-        if item.type == "image"
+        {"type": "image", "image": _load_image(item)} for item in media if item.type == "image"
     ]
     user_content.append({"type": "text", "text": question})
     return [
