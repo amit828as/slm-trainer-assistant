@@ -1,7 +1,16 @@
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from slm_trainer_assistant.schemas import EvalExample, EvalMedia, TrainingExample
+
+
+def _png_dimensions(path: Path) -> tuple[int, int]:
+    with path.open("rb") as image_file:
+        header = image_file.read(24)
+    assert header[:8] == b"\x89PNG\r\n\x1a\n"
+    return int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
 
 
 def test_valid_training_example() -> None:
@@ -95,6 +104,16 @@ def test_valid_eval_example_with_image_media() -> None:
 
     assert example.media[0].type == "image"
     assert example.media[0].path == "evals/media/debugging_loss_curve.png"
+
+
+def test_golden_image_eval_fixtures_are_readable() -> None:
+    media_dir = Path(__file__).resolve().parents[1] / "evals" / "media"
+
+    for image_path in media_dir.glob("*.png"):
+        width, height = _png_dimensions(image_path)
+
+        assert width >= 640, image_path
+        assert height >= 360, image_path
 
 
 @pytest.mark.parametrize(
